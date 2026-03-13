@@ -10,3 +10,8 @@
 - type: emagType
   id: All
   name: emag-type-all-name
+
+- type: emagType
+  id: Jestographic
+  name: emag-type-jestographic-name
+  isCleanable: true

@@ -17,4 +17,10 @@ public sealed partial class EmagTypePrototype : IPrototype
     /// </summary>
     [DataField]
     public LocId? Name { get; set; }
+
+    /// <summary>
+    /// Can this emag be cleaned with soap - Jestographic
+    /// </summary>
+    [DataField]
+    public bool IsCleanable = false;
 }
