@@ -14,7 +14,7 @@ public sealed partial class CleanEmagSystem : EntitySystem
     [Dependency] private readonly IPrototypeManager _proto = default!;
     [Dependency] private readonly SharedPopupSystem _popup = default!;
     [Dependency] private readonly SharedDoAfterSystem _doAfter = default!;
-
+    [Dependency] private readonly EmagSystem _emag = default!;
     public override void Initialize()
     {
         base.Initialize();
@@ -28,7 +28,7 @@ public sealed partial class CleanEmagSystem : EntitySystem
         if (args.Target == null || !args.CanReach || args.Handled)
             return;
 
-        if (!HasComp<EmaggedComponent>(args.Target))
+        if (!HasComp<EmaggedComponent>(args.Target) || !_emag.CheckProtoId(args.Target.Value, "Jestographic"))
             return;
 
         var doAfter = new DoAfterArgs(EntityManager, args.User, ent.Comp.CleanDuration, new CleaningEmaggedDeviceDoAfterEvent(), args.Target, args.Target)
@@ -40,7 +40,7 @@ public sealed partial class CleanEmagSystem : EntitySystem
 
         _doAfter.TryStartDoAfter(doAfter);
 
-        _popup.PopupPredicted(Loc.GetString("emag-cleaning", ("device", ent.Owner)), args.User, args.User);
+        _popup.PopupPredicted(Loc.GetString("emag-cleaning", ("device", args.Target)), args.User, args.User);
 
         args.Handled = true;
     }
@@ -69,7 +69,7 @@ public sealed partial class CleanEmagSystem : EntitySystem
 
         //Here to prevent soap spam
         if (ent.Comp.EmagTypeList.Count < 1)
-            RemComp<EmaggedComponent>(ent.Owner);
+            RemCompDeferred<EmaggedComponent>(ent.Owner);
 
         Dirty(ent);
         var ev = new EmagCleanedEvent(args.User, cleanableEmag.Value);

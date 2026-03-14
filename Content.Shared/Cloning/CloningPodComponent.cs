@@ -7,6 +7,7 @@
 
 using Content.Shared.DeviceLinking;
 using Content.Shared.Materials;
+using Content.Shared.Mind;
 using Robust.Shared.Audio;
 using Robust.Shared.Containers;
 using Robust.Shared.Prototypes;
@@ -67,6 +68,18 @@ public sealed partial class CloningPodComponent : Component
 
     [ViewVariables]
     public EntityUid? ConnectedConsole;
+
+    /// <summary>
+    /// Goobstation - Added to the contained entity when emagged jestographic cloning pod fail
+    /// </summary>
+    [DataField]
+    public ComponentRegistry? FailedComponents;
+
+    [ViewVariables]
+    public Entity<MindComponent>? FailedMind;
+
+    [ViewVariables]
+    public EntityUid? FailedBody;
 }
 
 [Serializable, NetSerializable]

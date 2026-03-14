@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using Content.Goobstation.Common.Cloning; // Goobstation
+using Content.Goobstation.Shared.Emag;
 using Content.Server.Atmos.EntitySystems;
 using Content.Server.Chat.Systems;
 using Content.Server.Cloning.Components;
@@ -79,6 +80,7 @@ public sealed class CloningPodSystem : EntitySystem
         SubscribeLocalEvent<CloningPodComponent, AnchorStateChangedEvent>(OnAnchor);
         SubscribeLocalEvent<CloningPodComponent, ExaminedEvent>(OnExamined);
         SubscribeLocalEvent<CloningPodComponent, GotEmaggedEvent>(OnEmagged);
+        SubscribeLocalEvent<CloningPodComponent, EmagCleanedEvent>(OnEmagCleaned); // Goobstation - Jestographic
     }
 
     private void OnComponentInit(Entity<CloningPodComponent> ent, ref ComponentInit args)
@@ -115,7 +117,7 @@ public sealed class CloningPodSystem : EntitySystem
     private void HandleMindAdded(EntityUid uid, BeingClonedComponent clonedComponent, MindAddedMessage message)
     {
         // <Goobstation>
-        if (clonedComponent.Original is {} original && Exists(original))
+        if (clonedComponent.Original is { } original && Exists(original))
         {
             var ev = new TransferredToCloneEvent(uid);
             RaiseLocalEvent(original, ref ev);
@@ -194,10 +196,10 @@ public sealed class CloningPodSystem : EntitySystem
         if (!TryComp<PhysicsComponent>(bodyToClone, out var physics))
             return false;
 
-        var cloningCost = (int)Math.Round(physics.FixturesMass);
+        var cloningCost = (int) Math.Round(physics.FixturesMass);
 
         if (_configManager.GetCVar(CCVars.BiomassEasyMode))
-            cloningCost = (int)Math.Round(cloningCost * EasyModeCloningCost);
+            cloningCost = (int) Math.Round(cloningCost * EasyModeCloningCost);
 
         // biomass checks
         var biomassAmount = _material.GetMaterialAmount(uid, clonePod.RequiredMaterial);
@@ -215,7 +217,7 @@ public sealed class CloningPodSystem : EntitySystem
         if (TryComp<DamageableComponent>(bodyToClone, out var damageable) &&
             damageable.Damage.DamageDict.TryGetValue("Cellular", out var cellularDmg))
         {
-            var chance = Math.Clamp((float)(cellularDmg / 100), 0, 1);
+            var chance = Math.Clamp((float) (cellularDmg / 100), 0, 1);
             chance *= failChanceModifier;
 
             if (cellularDmg > 0 && clonePod.ConnectedConsole != null)
@@ -224,6 +226,14 @@ public sealed class CloningPodSystem : EntitySystem
             if (_robustRandom.Prob(chance))
             {
                 clonePod.FailedClone = true;
+
+                //Goobstation - Jestographic
+                if (_emag.CheckProtoId(uid, "Jestographic"))
+                {
+                    clonePod.FailedBody = bodyToClone;
+                    clonePod.FailedMind = mindEnt;
+                }
+
                 UpdateStatus(uid, CloningPodStatus.Gore, clonePod);
                 AddComp<ActiveCloningPodComponent>(uid);
                 _material.TryChangeMaterialAmount(uid, clonePod.RequiredMaterial, -cloningCost);
@@ -288,10 +298,10 @@ public sealed class CloningPodSystem : EntitySystem
     /// </summary>
     private void OnEmagged(Entity<CloningPodComponent> ent, ref GotEmaggedEvent args)
     {
-        if (!_emag.CompareProtoId(args.Type, "Interaction")) // goob edit
+        if (!_emag.CompareProtoId(args.Type, "Interaction") && !_emag.CompareProtoId(args.Type, "Jestographic")) // goob edit
             return;
 
-        if (_emag.CheckProtoId(ent.Owner, "Interaction")) // goob edit
+        if (_emag.CheckProtoId(ent.Owner, "Interaction") || _emag.CheckProtoId(ent.Owner, "Jestographic")) // goob edit
             return;
 
         if (!this.IsPowered(ent.Owner, EntityManager))
@@ -326,10 +336,41 @@ public sealed class CloningPodSystem : EntitySystem
         var indices = _transformSystem.GetGridTilePositionOrDefault((uid, transform));
         var tileMix = _atmosphereSystem.GetTileMixture(transform.GridUid, null, indices, true);
 
-        if (HasComp<EmaggedComponent>(uid))
+        if (_emag.CheckProtoId(uid, "Interaction"))
         {
             _audio.PlayPvs(clonePod.ScreamSound, uid);
             Spawn(clonePod.MobSpawnId, transform.Coordinates);
+        }
+        else if (_emag.CheckProtoId(uid, "Jestographic"))
+        {
+            if (clonePod.FailedBody is not { } body || clonePod.FailedMind is not { } mind)
+                return;
+
+            if (!_cloning.TryCloning(body, _transformSystem.GetMapCoordinates(body), SettingsId, out var mob)) // spawn a new body
+            {
+                if (clonePod.ConnectedConsole != null)
+                    _chatSystem.TrySendInGameICMessage(clonePod.ConnectedConsole.Value, Loc.GetString("cloning-console-uncloneable-trait-error"), InGameICChatType.Speak, false);
+                return;
+            }
+
+            _containerSystem.Insert(mob.Value, clonePod.BodyContainer);
+
+            if (clonePod.FailedComponents == null || clonePod.FailedComponents.Count < 1)
+                return;
+
+            EntityManager.AddComponents(mob.Value, clonePod.FailedComponents);
+
+            //No popup and force transfer
+            _mindSystem.TransferTo(mind.Owner, mob.Value);
+            _popupSystem.PopupClient(Loc.GetString("cloning-pod-fail"), mob.Value);
+
+            if (clonePod.BodyContainer.ContainedEntity is not { Valid: true } cloneBody)
+                return;
+
+            _containerSystem.Remove(cloneBody, clonePod.BodyContainer);
+
+            clonePod.FailedBody = null;
+            clonePod.FailedMind = null;
         }
 
         Solution bloodSolution = new();
@@ -351,6 +392,24 @@ public sealed class CloningPodSystem : EntitySystem
 
         clonePod.UsedBiomass = 0;
         RemCompDeferred<ActiveCloningPodComponent>(uid);
+    }
+
+    private void OnEmagCleaned(Entity<CloningPodComponent> ent, ref EmagCleanedEvent args)
+    {
+        if (args.Handled)
+            return;
+
+        if (HasComp<ActiveCloningPodComponent>(ent.Owner))
+            return;
+
+        if (ent.Comp.FailedComponents == null)
+            return;
+
+        ent.Comp.FailedComponents.Clear();
+        ent.Comp.FailedBody = null;
+        ent.Comp.FailedMind = null;
+
+        args.Handled = true;
     }
 
     public void Reset(RoundRestartCleanupEvent ev)

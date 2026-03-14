@@ -47,6 +47,8 @@
   description: A Cloning Pod. 50% reliable.
   components:
   - type: CloningPod
+    failedComponents: # Goob - Jestographic
+    - type: Clumsy
   - type: DeviceList
   - type: DeviceNetwork
     deviceNetId: Wired
