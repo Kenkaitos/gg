@@ -11,10 +11,12 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+using Content.Shared.Polymorph;
 using Content.Shared.Whitelist;
 using JetBrains.Annotations;
 using Robust.Shared.Audio;
 using Robust.Shared.GameStates;
+using Robust.Shared.Prototypes;
 using Robust.Shared.Serialization;
 using Robust.Shared.Serialization.TypeSerializers.Implementations.Custom;
 
@@ -136,13 +138,26 @@ public sealed partial class MaterialReclaimerComponent : Component
     /// </remarks>
     [DataField, AutoNetworkedField]
     public int ItemsProcessed;
+
+    /// <summary>
+    /// How long is the stun duration transform will last
+    /// </summary>
+    [DataField]
+    public TimeSpan StunDuration = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Goobstation - What sound is used when reclaimer is transforming an entity
+    /// </summary>
+    [DataField]
+    public SoundSpecifier HonkSound = new SoundPathSpecifier("/Audio/Items/bikehorn.ogg");
 }
 
 [NetSerializable, Serializable]
 public enum RecyclerVisuals
 {
     Bloody,
-    Broken
+    Broken,
+    Clowned // Goobstation - Jestographic
 }
 
 [UsedImplicitly]

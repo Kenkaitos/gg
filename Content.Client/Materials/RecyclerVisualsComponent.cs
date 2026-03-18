@@ -15,6 +15,12 @@ public sealed partial class RecyclerVisualsComponent : Component
     public string BloodyKey = "bld";
 
     /// <summary>
+    /// Goobstation - Key appended to state string if clowned
+    /// </summary>
+    [DataField]
+    public string ClownedKey = "jst";
+
+    /// <summary>
     /// Base key for the visual state.
     /// </summary>
     [DataField]

@@ -78,6 +78,12 @@ using Robust.Shared.Prototypes;
 using Robust.Shared.Utility;
 using System.Linq;
 using Content.Shared.Humanoid;
+using Content.Server.Clothing.Systems;
+using Content.Shared.Popups;
+using Content.Shared.Stunnable;
+using Content.Shared.StatusEffectNew.Components;
+using Content.Goobstation.Common.Emag;
+using Robust.Shared.Network;
 
 namespace Content.Server.Materials;
 
@@ -96,6 +102,9 @@ public sealed class MaterialReclaimerSystem : SharedMaterialReclaimerSystem
     [Dependency] private readonly StackSystem _stack = default!;
     [Dependency] private readonly SharedMindSystem _mind = default!;
     [Dependency] private readonly IAdminLogManager _adminLogger = default!;
+    [Dependency] private readonly OutfitSystem _outfit = default!; // Goobstation - Jestographic
+    [Dependency] private readonly SharedStunSystem _stun = default!; // Goobstation - Jestographic
+    [Dependency] private readonly INetManager _net = default!; // Goobstation
 
     /// <inheritdoc/>
     public override void Initialize()
@@ -110,6 +119,7 @@ public sealed class MaterialReclaimerSystem : SharedMaterialReclaimerSystem
 
         SubscribeLocalEvent<MaterialReclaimerComponent, BreakageEventArgs>(OnBreakage);
         SubscribeLocalEvent<MaterialReclaimerComponent, RepairedEvent>(OnRepaired);
+        SubscribeLocalEvent<MaterialReclaimerComponent, EmagCleanedEvent>(OnEmagCleaned); // Goobstation - Jestographic
     }
 
     private void OnPowerChanged(Entity<MaterialReclaimerComponent> entity, ref PowerChangedEvent args)
@@ -246,6 +256,28 @@ public sealed class MaterialReclaimerSystem : SharedMaterialReclaimerSystem
             _body.GibBody(item, true);
             _appearance.SetData(uid, RecyclerVisuals.Bloody, true);
         }
+        else if (CanCluwnified(uid, item, component)) // Goobstation - Jestographic
+        {
+            //My client keep crashing so i add it here
+            if (_net.IsClient)
+                return;
+
+            //Here to avoid the infinite stuck and duplicate and it can only be done once
+            EnsureComp<CluwneImmuneComponent>(item);
+
+            _audio.PlayPvs(component.HonkSound, uid);
+
+            _outfit.SetOutfit(item, "CluwneGear");
+
+            _popup.PopupEntity(Loc.GetString("emag-material-reclaimer-transform", ("victim", item)), uid, PopupType.LargeCaution);
+
+            if (HasComp<StatusEffectComponent>(item))
+                _stun.KnockdownOrStun(item, component.StunDuration);
+
+            _appearance.SetData(uid, RecyclerVisuals.Clowned, true);
+
+            return;
+        }
         else
         {
             SpawnChemicalsFromComposition(uid, item, completion, true, component, xform);
@@ -340,5 +372,15 @@ public sealed class MaterialReclaimerSystem : SharedMaterialReclaimerSystem
         {
             _puddle.TrySpillAt(reclaimer, totalChemicals, out _, sound, transformComponent: xform);
         }
+    }
+
+    private void OnEmagCleaned(Entity<MaterialReclaimerComponent> ent, ref EmagCleanedEvent args)
+    {
+        if (args.Handled)
+            return;
+
+        _appearance.SetData(ent.Owner, RecyclerVisuals.Clowned, false);
+
+        args.Handled = true;
     }
 }

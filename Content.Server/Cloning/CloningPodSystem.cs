@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using Content.Goobstation.Common.Cloning; // Goobstation
-using Content.Goobstation.Shared.Emag;
+using Content.Goobstation.Common.Emag;
 using Content.Server.Atmos.EntitySystems;
 using Content.Server.Chat.Systems;
 using Content.Server.Cloning.Components;
@@ -227,12 +227,10 @@ public sealed class CloningPodSystem : EntitySystem
             {
                 clonePod.FailedClone = true;
 
-                //Goobstation - Jestographic
-                if (_emag.CheckProtoId(uid, "Jestographic"))
-                {
-                    clonePod.FailedBody = bodyToClone;
-                    clonePod.FailedMind = mindEnt;
-                }
+                //Goobstation start - Jestographic
+                clonePod.FailedBody = bodyToClone;
+                clonePod.FailedMind = mindEnt;
+                //Goobstation end
 
                 UpdateStatus(uid, CloningPodStatus.Gore, clonePod);
                 AddComp<ActiveCloningPodComponent>(uid);
@@ -341,7 +339,7 @@ public sealed class CloningPodSystem : EntitySystem
             _audio.PlayPvs(clonePod.ScreamSound, uid);
             Spawn(clonePod.MobSpawnId, transform.Coordinates);
         }
-        else if (_emag.CheckProtoId(uid, "Jestographic"))
+        else if (_emag.CheckProtoId(uid, "Jestographic")) // Goobstation - Jestographic
         {
             if (clonePod.FailedBody is not { } body || clonePod.FailedMind is not { } mind)
                 return;
@@ -360,9 +358,8 @@ public sealed class CloningPodSystem : EntitySystem
 
             EntityManager.AddComponents(mob.Value, clonePod.FailedComponents);
 
-            //No popup and force transfer
+            //Force transfer
             _mindSystem.TransferTo(mind.Owner, mob.Value);
-            _popupSystem.PopupClient(Loc.GetString("cloning-pod-fail"), mob.Value);
 
             if (clonePod.BodyContainer.ContainedEntity is not { Valid: true } cloneBody)
                 return;
@@ -402,10 +399,6 @@ public sealed class CloningPodSystem : EntitySystem
         if (HasComp<ActiveCloningPodComponent>(ent.Owner))
             return;
 
-        if (ent.Comp.FailedComponents == null)
-            return;
-
-        ent.Comp.FailedComponents.Clear();
         ent.Comp.FailedBody = null;
         ent.Comp.FailedMind = null;
 

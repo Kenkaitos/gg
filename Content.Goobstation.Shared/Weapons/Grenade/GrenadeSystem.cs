@@ -1,6 +1,6 @@
 using Content.Goobstation.Shared.Boomerang;
-using Content.Goobstation.Shared.Emag;
 using Content.Shared.Emag.Systems;
+using Content.Goobstation.Common.Emag;
 
 namespace Content.Goobstation.Shared.Weapons.Grenade;
 public sealed partial class GrenadeSystem : EntitySystem

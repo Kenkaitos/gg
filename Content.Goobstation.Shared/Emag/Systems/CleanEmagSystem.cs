@@ -6,6 +6,7 @@ using Content.Shared.Emag.Systems;
 using Content.Shared.Popups;
 using Content.Shared.DoAfter;
 using Content.Goobstation.Common.Emag.Prototypes;
+using Content.Goobstation.Common.Emag;
 
 namespace Content.Goobstation.Shared.Emag.Systems;
 
@@ -66,10 +67,6 @@ public sealed partial class CleanEmagSystem : EntitySystem
 
         if (!ent.Comp.EmagTypeList.Remove(cleanableEmag.Value))
             return;
-
-        //Here to prevent soap spam
-        if (ent.Comp.EmagTypeList.Count < 1)
-            RemCompDeferred<EmaggedComponent>(ent.Owner);
 
         Dirty(ent);
         var ev = new EmagCleanedEvent(args.User, cleanableEmag.Value);
